@@ -81,16 +81,23 @@ def bina(a, tema, paras):
             else:                                      # set 09-10: tiada lokasi dalam docx
                 sub, lokasi, tahun = rest, '', ''
             subtema, lokasi, tahun = tc(sub.strip()), tc(lokasi.strip()), tc(tahun.strip())
-            tajuk = nama = blok.pop(0)[0]
+            tajuk = blok.pop(0)[0]
+            tajuk = re.sub(r'^\d+\.\s*', '', tajuk)                 # awalan "331. " (set 12)
+            ym = re.search(r'\s*\((\d{4}(?:\s*[\u2013-]\s*\d{4})?)\)\s*$', tajuk)
+            if ym:                                                    # tahun hujung tajuk -> medan tahun
+                tahun = tahun or ym.group(1); tajuk = tajuk[:ym.start()]
+            nama = tajuk
         sumber_t, sumber_l = blok[0]
-        assert sumber_t.startswith('Sumber Fakta'), f'Kisah {no}: baris sumber tiada ({sumber_t[:40]})'
+        assert sumber_t.startswith('Sumber'), f'Kisah {no}: baris sumber tiada ({sumber_t[:40]})'
         assert sumber_l, f'Kisah {no}: sumber tiada hyperlink'
         hook = blok[1][0]
         body = [t for t, _ in blok[2:]]
+        while body and body[0].isupper():          # hook dua baris HURUF BESAR (set 12)
+            hook += '\n' + body.pop(0)
         assert len(body) >= 15, f'Kisah {no}: badan cerita terlalu pendek ({len(body)})'
         tm = tema.get(str(no)) or auto_tema(tajuk, subtema, hook)
         it = dict(id=a.mula + n, siri=a.siri, no=no, nama=nama, tajuk=tajuk, lokasi=lokasi, tahun=tahun,
-                  sumber=sumber_t.split(':', 1)[1].strip(), link=sumber_l[0], tema=tm, hook=hook, body=body)
+                  sumber=re.sub(r'\s*\(https?://[^)]*\)\s*$', '', sumber_t.split(':', 1)[1].strip()), link=sumber_l[0], tema=tm, hook=hook, body=body)
         if subtema: it['subtema'] = subtema
         items.append(it)
     return items
