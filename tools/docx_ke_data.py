@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """docx Kisah Benar -> blok JS untuk data.js (tiada dependency).
 
-Guna:  python3 -I tools/docx_ke_data.py "Set.docx" --siri KisahBenar-02 --mula 31 > blok.txt
+Guna:  python3 -I tools/docx_ke_data.py "Set.docx" --siri KisahBenar-11 --mula 301 --tema tema.json --fail data/KisahBenar-11.js
+Kemudian tambah nama siri dalam data/index.js (SIRI.utama).
 Format docx: baris `Kisah NN: Subjek (Julukan) — Lokasi (Tahun)`, kemudian
 `Sumber Fakta & Laporan Susulan: A & B` (ada hyperlink), baris hook HURUF BESAR,
 dan perenggan cerita.  Tema diisi dari jadual TEMA di bawah (ikut nombor kisah dalam docx);
@@ -26,9 +27,17 @@ def baca(path):
     return out
 
 ACRONIM = {'OKU','CEO','UK','AS','USA','AI','DNA','NASA','NBA','NFL','SPM','UAE','PBB','FBI','CPR','ICU','KL'}
+KECIL = {'dan', 'ke', 'di', 'dari', 'hingga', 'yang', 'dalam', 'atas', 'untuk'}
 def tc(t):
-    return ' '.join(w if w.strip('(),') in ACRONIM else w.capitalize() if w.lower() != 'hingga' else 'hingga'
-                    for w in t.split(' ')).replace('Dan ', 'Dan ')
+    """HURUF BESAR -> Title Case, kekalkan akronim, singkatan bertitik (D.C.), perkataan kecil, sempang."""
+    out = []
+    for k, w in enumerate(t.split(' ')):
+        core = w.strip('(),/')
+        if core.upper() in ACRONIM: out.append(w.upper()); continue
+        if re.fullmatch(r'(?i)([a-z]\.)+[a-z]?\.?', core): out.append(w.upper()); continue
+        if k and core.lower() in KECIL: out.append(w.lower()); continue
+        out.append('-'.join(x[:1].upper() + x[1:].lower() for x in w.split('-')))
+    return ' '.join(out)
 
 # tema automatik ikut kata kunci (urutan = keutamaan); semak keluaran dan ganti dengan --tema bila salah
 KEYWORD = [
@@ -64,10 +73,14 @@ def bina(a, tema, paras):
             nama, tajuk, subtema = subjek.split(' (')[0], subjek, ''
         else:
             m = new.match(paras[i][0])
-            sub, meta = m.group(2).rsplit(' (', 1)
-            meta = meta.rstrip(')')
-            lokasi, tahun = meta.rsplit(' - ', 1) if ' - ' in meta else (meta, '')
-            subtema, lokasi, tahun = tc(sub.strip()), tc(lokasi.strip()), tahun.strip().lower()
+            rest = m.group(2).strip()
+            if rest.endswith(')') and ' (' in rest:   # set 04-08: tajuk (LOKASI - TAHUN)
+                sub, meta = rest.rsplit(' (', 1)
+                meta = meta.rstrip(')')
+                lokasi, tahun = meta.rsplit(' - ', 1) if ' - ' in meta else (meta, '')
+            else:                                      # set 09-10: tiada lokasi dalam docx
+                sub, lokasi, tahun = rest, '', ''
+            subtema, lokasi, tahun = tc(sub.strip()), tc(lokasi.strip()), tc(tahun.strip())
             tajuk = nama = blok.pop(0)[0]
         sumber_t, sumber_l = blok[0]
         assert sumber_t.startswith('Sumber Fakta'), f'Kisah {no}: baris sumber tiada ({sumber_t[:40]})'
@@ -87,6 +100,7 @@ def main():
     ap.add_argument('docx'); ap.add_argument('--siri', required=True)
     ap.add_argument('--mula', type=int, required=True, help='id global pertama')
     ap.add_argument('--tema', help='fail JSON {"1":"Tema",...} ikut nombor dalam siri (1-30); mengatasi tema automatik')
+    ap.add_argument('--fail', help='tulis terus ke data/<siri>.js (muat malas) dan bukannya stdout')
     ap.add_argument('--jadual', action='store_true', help='cetak jadual semakan tema ke stderr')
     a = ap.parse_args()
     tema = json.load(open(a.tema, encoding='utf8')) if a.tema else {}
@@ -94,7 +108,12 @@ def main():
     assert len(items) == 30, f'dijangka 30 kisah, jumpa {len(items)}'
     if a.jadual:
         for it in items: print(it['no'], '|', it['tema'], '|', it['tajuk'][:60], '|', it.get('subtema', ''), file=sys.stderr)
-    print(',\n'.join(json.dumps(it, ensure_ascii=False) for it in items))
+    blok = ',\n'.join(json.dumps(it, ensure_ascii=False) for it in items)
+    if a.fail:
+        with open(a.fail, 'w', encoding='utf8') as f:
+            f.write(f'(window.STORIES=window.STORIES||[]).push(\n{blok}\n);\n')
+    else:
+        print(blok)
 
 if __name__ == '__main__':
     main()

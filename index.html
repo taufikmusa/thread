@@ -88,15 +88,15 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 </div></main>
 <footer>Thread Vault · Kisah benar berdasarkan laporan berita rasmi, pautan sumber disertakan pada setiap kisah.</footer>
 
-<script src="data.js"></script>
+<script src="data/index.js"></script>
 <script>
 (function(){
 'use strict';
-var S=window.STORIES||[], TABS=window.TAB_UTAMA||[], PAGE=30, LIMIT=500;
+var SI=window.SIRI||{utama:[],arsip:[]}, TABS=SI.utama, S=window.STORIES=window.STORIES||[], PAGE=30, LIMIT=500, LOADED={};
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 var st={tab:ld('tab',TABS[0]||'Archive'),q:'',tema:'Semua',status:'all',n:PAGE,dah:ld('dahPost',{}),open:{},pecah:{}};
-if(TABS.concat('Archive').indexOf(st.tab)<0)st.tab=TABS[0]||'Archive';
+if(tabList().indexOf(st.tab)<0)st.tab=TABS[0]||'Archive';
 var $=function(id){return document.getElementById(id)};
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 
@@ -118,10 +118,20 @@ function salin(t,btn,lbl){
 }
 function norm(x){return (x||'').toLowerCase()}
 function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.sumber,s.hook,s.body.join(' ')].join(' '))}
-S.forEach(function(s){s._h=hay(s)});
 
-function tabList(){return TABS.concat('Archive')}
-function inTab(s){return st.tab==='Archive'?TABS.indexOf(s.siri)<0:s.siri===st.tab}
+function tabList(){return SI.arsip.length?TABS.concat('Archive'):TABS}
+function inTab(s){return st.tab==='Archive'?SI.arsip.indexOf(s.siri)>=0:s.siri===st.tab}
+function muat(nama){
+  if(LOADED[nama])return LOADED[nama];
+  LOADED[nama]=new Promise(function(ok,gagal){
+    var e=document.createElement('script');e.src='data/'+nama+'.js';e.onload=ok;e.onerror=function(){delete LOADED[nama];gagal(new Error(nama))};document.head.appendChild(e)});
+  return LOADED[nama];
+}
+function pergi(){
+  var perlu=st.tab==='Archive'?SI.arsip:[st.tab];
+  $('count').textContent='Memuatkan...';
+  Promise.all(perlu.map(muat)).then(render,function(){$('count').textContent='Gagal memuatkan data. Cuba refresh.'});
+}
 function filtered(){
   var ws=norm(st.q).split(/\s+/).filter(Boolean);
   return S.filter(function(s){
@@ -129,14 +139,15 @@ function filtered(){
     if(st.tema!=='Semua'&&s.tema!==st.tema)return false;
     if(st.status==='belum'&&st.dah[s.id])return false;
     if(st.status==='dah'&&!st.dah[s.id])return false;
+    if(!s._h)s._h=hay(s);
     return ws.every(function(w){return s._h.indexOf(w)>=0});
   });
 }
 function renderTabs(){
   var t=$('tabs');t.textContent='';
   tabList().forEach(function(n){
-    var b=el('button','tab',n);b.type='button';b.setAttribute('aria-pressed',n===st.tab);
-    b.onclick=function(){st.tab=n;st.tema='Semua';st.n=PAGE;sv('tab',n);render()};
+    var b=el('button','tab',n.replace('KisahBenar-','Set '));b.type='button';b.setAttribute('aria-pressed',n===st.tab);
+    b.onclick=function(){st.tab=n;st.tema='Semua';st.n=PAGE;sv('tab',n);renderTabs();pergi()};
     t.appendChild(b);
   });
 }
@@ -169,7 +180,8 @@ function card(s){
   m.appendChild(el('span','badge',s.tema));
   c.appendChild(m);
   c.appendChild(el('h2',null,s.tajuk));
-  c.appendChild(el('p','lok',s.lokasi+' ('+s.tahun+')'+(s.subtema?' · '+s.subtema:'')));
+  var lk=[s.lokasi?(s.lokasi+(s.tahun?' ('+s.tahun+')':'')):s.tahun,s.subtema].filter(Boolean).join(' · ');
+  if(lk)c.appendChild(el('p','lok',lk));
 
   var full=teksPenuh(s);
   c.appendChild(el('div','lbl','Thread penuh · '+full.length.toLocaleString('en-US')+' aksara'));
@@ -221,7 +233,7 @@ function render(){
 var tm;$('q').addEventListener('input',function(e){clearTimeout(tm);tm=setTimeout(function(){st.q=e.target.value;if(st.q)st.tema='Semua';st.n=PAGE;render()},120)});
 Array.prototype.forEach.call(document.querySelectorAll('input[name=st]'),function(r){r.onchange=function(){st.status=r.value;st.n=PAGE;render()}});
 $('lagi').onclick=function(){st.n+=PAGE;render()};
-render();
+pergi();
 })();
 </script>
 </body>
