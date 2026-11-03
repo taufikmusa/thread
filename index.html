@@ -117,7 +117,7 @@ function salin(t,btn,lbl){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb();
 }
 function norm(x){return (x||'').toLowerCase()}
-function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.sumber,s.hook,s.body.join(' ')].join(' '))}
+function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.sumber,s.hook,s.body.join(' ')].join(' '))}
 S.forEach(function(s){s._h=hay(s)});
 
 function tabList(){return TABS.concat('Archive')}
@@ -169,7 +169,7 @@ function card(s){
   m.appendChild(el('span','badge',s.tema));
   c.appendChild(m);
   c.appendChild(el('h2',null,s.tajuk));
-  c.appendChild(el('p','lok',s.lokasi+' ('+s.tahun+')'));
+  c.appendChild(el('p','lok',s.lokasi+' ('+s.tahun+')'+(s.subtema?' · '+s.subtema:'')));
 
   var full=teksPenuh(s);
   c.appendChild(el('div','lbl','Thread penuh · '+full.length.toLocaleString('en-US')+' aksara'));
