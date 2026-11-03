@@ -97,7 +97,7 @@ def bina(a, tema, paras):
         assert len(body) >= 15, f'Kisah {no}: badan cerita terlalu pendek ({len(body)})'
         tm = tema.get(str(no)) or auto_tema(tajuk, subtema, hook)
         it = dict(id=a.mula + n, siri=a.siri, no=no, nama=nama, tajuk=tajuk, lokasi=lokasi, tahun=tahun,
-                  sumber=re.sub(r'\s*\(https?://[^)]*\)\s*$', '', sumber_t.split(':', 1)[1].strip()), link=sumber_l[0], tema=tm, hook=hook, body=body)
+                  sumber=re.sub(r'\s*\(https?://.*$', '', sumber_t.split(':', 1)[1].strip()), link=sumber_l[0], tema=tm, hook=hook, body=body)
         if subtema: it['subtema'] = subtema
         items.append(it)
     return items
