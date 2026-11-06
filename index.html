@@ -27,6 +27,9 @@ header p{margin:0;color:#C5D0E4;font-size:14px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .tab{border:1px solid var(--border);background:var(--card);color:var(--navy);border-radius:999px;padding:6px 14px;font:600 13px var(--sans);cursor:pointer}
 .tab[aria-pressed=true]{background:var(--yellow);border-color:var(--yellow-dk);color:#07152B}
+.grup .tab{background:transparent;border-color:var(--navy);font-size:14px}
+.grup .tab[aria-pressed=true]{background:var(--navy);color:var(--bg);border-color:var(--navy)}
+.ibrah{font-size:13px;color:var(--navy-2);margin:0 0 12px}
 #q{width:100%;border:1px solid var(--border);background:var(--card);color:var(--navy);border-radius:12px;padding:11px 14px;font:16px var(--sans)}
 #q:focus{outline:2px solid var(--yellow-dk);outline-offset:1px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -69,6 +72,7 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 </div></header>
 
 <div class="bar"><div class="wrap">
+  <div class="tabs grup" id="grup" role="group" aria-label="Koleksi" hidden></div>
   <div class="tabs" id="tabs" role="group" aria-label="Siri"></div>
   <input id="q" type="search" placeholder="Cari nama, negara, tema, isi cerita..." autocomplete="off" aria-label="Cari">
   <div class="chips" id="chips" role="group" aria-label="Tema"></div>
@@ -96,8 +100,13 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 var SI=window.SIRI||{utama:[],arsip:[]}, TABS=SI.utama, S=window.STORIES=window.STORIES||[], PAGE=30, LIMIT=500, LOADED={};
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-var st={tab:ld('tab',TABS[0]||'Archive'),q:'',tema:'Semua',status:'all',n:PAGE,dah:ld('dahPost',{}),open:{},pecah:{}};
-if(tabList().indexOf(st.tab)<0)st.tab=TABS[0]||'Archive';
+var NAMA_GRUP={KisahBenar:'Kisah Benar',Sirah:'Sirah'};
+function grupDari(n){return n.split('-')[0]}
+var GRUP=[];TABS.forEach(function(n){var g=grupDari(n);if(GRUP.indexOf(g)<0)GRUP.push(g)});
+var st={grup:ld('grup',GRUP[0]),tab:ld('tab',TABS[0]||'Archive'),q:'',tema:'Semua',status:'all',n:PAGE,dah:ld('dahPost',{}),open:{},pecah:{}};
+if(TABS.indexOf(st.tab)>=0)st.grup=grupDari(st.tab);
+if(GRUP.indexOf(st.grup)<0)st.grup=GRUP[0];
+if(tabList().indexOf(st.tab)<0)st.tab=tabList()[0]||'Archive';
 var $=function(id){return document.getElementById(id)};
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 
@@ -118,9 +127,9 @@ function salin(t,btn,lbl){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb();
 }
 function norm(x){return (x||'').toLowerCase()}
-function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.gambar,s.visual,s.sumber,s.hook,s.body.join(' ')].join(' '))}
+function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.ibrah,s.gambar,s.visual,s.sumber,s.hook,s.body.join(' ')].join(' '))}
 
-function tabList(){return SI.arsip.length?TABS.concat('Archive'):TABS}
+function tabList(){var l=TABS.filter(function(n){return grupDari(n)===st.grup});return SI.arsip.length?l.concat('Archive'):l}
 function inTab(s){return st.tab==='Archive'?SI.arsip.indexOf(s.siri)>=0:s.siri===st.tab}
 function muat(nama){
   if(LOADED[nama])return LOADED[nama];
@@ -145,9 +154,15 @@ function filtered(){
   });
 }
 function renderTabs(){
+  var g=$('grup');g.textContent='';g.hidden=GRUP.length<2;
+  GRUP.forEach(function(x){
+    var gb=el('button','tab',NAMA_GRUP[x]||x);gb.type='button';gb.setAttribute('aria-pressed',x===st.grup);
+    gb.onclick=function(){if(x===st.grup)return;st.grup=x;sv('grup',x);st.tab=tabList()[0];st.tema='Semua';st.n=PAGE;sv('tab',st.tab);renderTabs();pergi()};
+    g.appendChild(gb);
+  });
   var t=$('tabs');t.textContent='';
   tabList().forEach(function(n){
-    var b=el('button','tab',n.replace('KisahBenar-','Set '));b.type='button';b.setAttribute('aria-pressed',n===st.tab);
+    var b=el('button','tab',n==='Archive'?n:'Set '+n.split('-')[1]);b.type='button';b.setAttribute('aria-pressed',n===st.tab);
     b.onclick=function(){st.tab=n;st.tema='Semua';st.n=PAGE;sv('tab',n);renderTabs();pergi()};
     t.appendChild(b);
   });
@@ -183,6 +198,7 @@ function card(s){
   c.appendChild(el('h2',null,s.tajuk));
   var lk=[s.lokasi?(s.lokasi+(s.tahun?' ('+s.tahun+')':'')):s.tahun,s.subtema].filter(Boolean).join(' · ');
   if(lk)c.appendChild(el('p','lok',lk));
+  if(s.ibrah)c.appendChild(el('p','ibrah','Ibrah: '+s.ibrah));
 
   var full=teksPenuh(s);
   c.appendChild(el('div','lbl','Thread penuh · '+full.length.toLocaleString('en-US')+' aksara'));
