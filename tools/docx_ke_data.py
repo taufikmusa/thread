@@ -11,6 +11,10 @@ kalau tiada padanan, jatuh ke 'Kebaikan Insan' dan dicetak amaran ke stderr.
 import argparse, html, json, re, sys, zipfile
 
 
+def bersih(t):
+    t = re.sub(r'\*{1,3}([^*\n]+?)\*{1,3}', r'\1', t)
+    return re.sub(r'\*+', '', t)                      # penanda tergantung (tebal merentas perenggan)
+
 def baca(path):
     z = zipfile.ZipFile(path)
     rels_xml = z.read('word/_rels/document.xml.rels').decode('utf8')
@@ -22,12 +26,17 @@ def baca(path):
     out = []
     for p in re.findall(r'<w:p[ >].*?</w:p>', x, flags=re.S):
         links = [rels.get(i) for i in re.findall(r'<w:hyperlink[^>]*r:id="([^"]+)"', p)]
-        t = html.unescape(re.sub(r'<[^>]+>', '', p)).strip()
+        t = bersih(html.unescape(re.sub(r'<[^>]+>', '', p)).strip())
         out.append((t, [l for l in links if l]))
     return out
 
-ACRONIM = {'OKU','CEO','UK','AS','USA','AI','DNA','NASA','NBA','NFL','SPM','UAE','PBB','FBI','CPR','ICU','KL'}
+ACRONIM = {'GPS','SARS','OKU','CEO','UK','AS','USA','AI','DNA','NASA','NBA','NFL','SPM','UAE','PBB','FBI','CPR','ICU','KL'}
 KECIL = {'dan', 'ke', 'di', 'dari', 'hingga', 'yang', 'dalam', 'atas', 'untuk'}
+def cap(x):
+    """Huruf besar pada huruf pertama (langkau tanda petik/kurungan di depan), selebihnya kecil."""
+    m = re.match(r"^([^A-Za-z\u00C0-\u024F0-9]*)(.*)$", x)
+    return m.group(1) + m.group(2)[:1].upper() + m.group(2)[1:].lower()
+
 def tc(t):
     """HURUF BESAR -> Title Case, kekalkan akronim, singkatan bertitik (D.C.), perkataan kecil, sempang."""
     out = []
@@ -36,7 +45,8 @@ def tc(t):
         if core.upper() in ACRONIM: out.append(w.upper()); continue
         if re.fullmatch(r'(?i)([a-z]\.)+[a-z]?\.?', core): out.append(w.upper()); continue
         if k and core.lower() in KECIL: out.append(w.lower()); continue
-        out.append('-'.join(x[:1].upper() + x[1:].lower() for x in w.split('-')))
+        if re.fullmatch(r'(?i)rm\d[\d,.]*', core): out.append(w.upper()); continue
+        out.append('-'.join(cap(x) for x in w.split('-')))
     return ' '.join(out)
 
 # tema automatik ikut kata kunci (urutan = keutamaan); semak keluaran dan ganti dengan --tema bila salah
@@ -54,12 +64,26 @@ def auto_tema(*teks):
         if any(k in t for k in kws): return nama
     return 'Kebaikan Insan'
 
+def outro_kiraan(paras):
+    """Kira berapa kali setiap perenggan muncul selepas baris pengesahan 'Kisah #N (...)' (outro generik set 16+)."""
+    from collections import Counter
+    c, after = Counter(), False
+    for t, _ in paras:
+        if re.match(r'^KISAH\s*#\d+\s*:', t): after = False
+        elif re.match(r'^Kisah #\d+ \(', t): after = True
+        elif after and t: c[t] += 1
+    return c
+
 def bina(a, tema, paras):
+    a_outro = getattr(a, 'outro', False)
+    OUTRO_KIRAAN = outro_kiraan(paras)
     old = re.compile(r'^Kisah\s*(\d+)\s*:\s*(.+)$')
     new = re.compile(r'^KISAH\s*#(\d+)\s*[\u2022\u00b7\-]\s*(.+)$')
+    kolon = re.compile(r'^KISAH\s*#(\d+)\s*:\s*(.+)$')                 # set 16+: KISAH #451: TAJUK
     idx_old = [i for i, (t, _) in enumerate(paras) if old.match(t)]
     idx_new = [i for i, (t, _) in enumerate(paras) if new.match(t)]
-    fmt, idx = ('old', idx_old) if len(idx_old) >= len(idx_new) else ('new', idx_new)
+    idx_kol = [i for i, (t, _) in enumerate(paras) if kolon.match(t)]
+    fmt, idx = max((('old', idx_old), ('new', idx_new), ('kolon', idx_kol)), key=lambda x: len(x[1]))
     items = []
     for n, i in enumerate(idx):
         end = idx[n + 1] if n + 1 < len(idx) else len(paras)
@@ -71,6 +95,9 @@ def bina(a, tema, paras):
             lm = re.match(r'(.*)\s\(([^()]*)\)\s*$', meta)
             lokasi, tahun = (lm.group(1), lm.group(2)) if lm else (meta, '')
             nama, tajuk, subtema = subjek.split(' (')[0], subjek, ''
+        elif fmt == 'kolon':
+            m = kolon.match(paras[i][0])
+            tajuk = nama = tc(m.group(2).strip()); lokasi = tahun = subtema = ''
         else:
             m = new.match(paras[i][0])
             rest = m.group(2).strip()
@@ -87,18 +114,32 @@ def bina(a, tema, paras):
             if ym:                                                    # tahun hujung tajuk -> medan tahun
                 tahun = tahun or ym.group(1); tajuk = tajuk[:ym.start()]
             nama = tajuk
+        gambar = ''
+        if fmt == 'kolon':
+            if blok[0][0].startswith('Kata Kunci'):
+                gambar = blok.pop(0)[0].split(':', 1)[1].strip()
         sumber_t, sumber_l = blok[0]
         assert sumber_t.startswith('Sumber'), f'Kisah {no}: baris sumber tiada ({sumber_t[:40]})'
         assert sumber_l, f'Kisah {no}: sumber tiada hyperlink'
-        hook = blok[1][0]
-        body = [t for t, _ in blok[2:]]
-        while body and body[0].isupper():          # hook dua baris HURUF BESAR (set 12)
-            hook += '\n' + body.pop(0)
-        assert len(body) >= 15, f'Kisah {no}: badan cerita terlalu pendek ({len(body)})'
+        if fmt == 'kolon':
+            body = [t for t, _ in blok[1:]]
+            v = next((k for k, t in enumerate(body) if re.match(r'^Kisah #\d+ \(', t)), None)
+            if v is not None:                       # buang baris pengesahan + outro generik; kekalkan penutup khusus
+                sisa = body[v + 1:]
+                ekor = [t for t in sisa if OUTRO_KIRAAN.get(t, 0) < 10 and not t.startswith('Kisah #')]
+                body = body[:v] + ekor if not a_outro else body
+            hook = body.pop(0)
+        else:
+            hook = blok[1][0]
+            body = [t for t, _ in blok[2:]]
+            while body and body[0].isupper():      # hook dua baris HURUF BESAR (set 12)
+                hook += '\n' + body.pop(0)
+        assert len(body) >= 10, f'Kisah {no}: badan cerita terlalu pendek ({len(body)})'
         tm = tema.get(str(no)) or auto_tema(tajuk, subtema, hook)
         it = dict(id=a.mula + n, siri=a.siri, no=no, nama=nama, tajuk=tajuk, lokasi=lokasi, tahun=tahun,
                   sumber=re.sub(r'\s*\(https?://.*$', '', sumber_t.split(':', 1)[1].strip()), link=sumber_l[0], tema=tm, hook=hook, body=body)
         if subtema: it['subtema'] = subtema
+        if gambar: it['gambar'] = gambar
         items.append(it)
     return items
 
@@ -108,6 +149,7 @@ def main():
     ap.add_argument('--mula', type=int, required=True, help='id global pertama')
     ap.add_argument('--tema', help='fail JSON {"1":"Tema",...} ikut nombor dalam siri (1-30); mengatasi tema automatik')
     ap.add_argument('--fail', help='tulis terus ke data/<siri>.js (muat malas) dan bukannya stdout')
+    ap.add_argument('--outro', action='store_true', help='set 16+: kekalkan baris pengesahan dan outro generik (lalai: dibuang)')
     ap.add_argument('--jadual', action='store_true', help='cetak jadual semakan tema ke stderr')
     a = ap.parse_args()
     tema = json.load(open(a.tema, encoding='utf8')) if a.tema else {}

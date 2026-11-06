@@ -118,7 +118,7 @@ function salin(t,btn,lbl){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb();
 }
 function norm(x){return (x||'').toLowerCase()}
-function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.sumber,s.hook,s.body.join(' ')].join(' '))}
+function hay(s){return norm([s.siri,'kisah '+s.no,s.nama,s.tajuk,s.lokasi,s.tahun,s.tema,s.subtema,s.gambar,s.sumber,s.hook,s.body.join(' ')].join(' '))}
 
 function tabList(){return SI.arsip.length?TABS.concat('Archive'):TABS}
 function inTab(s){return st.tab==='Archive'?SI.arsip.indexOf(s.siri)>=0:s.siri===st.tab}
@@ -202,6 +202,12 @@ function card(s){
   b5.onclick=function(){if(st.dah[s.id])delete st.dah[s.id];else st.dah[s.id]=1;sv('dahPost',st.dah);render()};
   r.appendChild(b1);r.appendChild(b2);r.appendChild(b3);r.appendChild(b5);c.appendChild(r);
   var r2=el('div','row');r2.appendChild(b4);c.appendChild(r2);
+  if(s.gambar){
+    c.appendChild(el('div','lbl','Kata kunci cari gambar'));
+    var gb=el('div','box',s.gambar);c.appendChild(gb);
+    var gr=el('div','row');var gc=el('button','btn','📋 Copy Kata Kunci');gc.type='button';gc.onclick=function(){salin(s.gambar,gc,'📋 Copy Kata Kunci')};
+    gr.appendChild(gc);c.appendChild(gr);
+  }
 
   var segs=el('div');c.appendChild(segs);
   function drawSegs(){
