@@ -74,12 +74,12 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 <div class="bar"><div class="wrap">
   <div class="tabs grup" id="grup" role="group" aria-label="Koleksi" hidden></div>
   <div class="tabs" id="tabs" role="group" aria-label="Siri"></div>
-  <input id="q" type="search" placeholder="Cari nama, negara, tema, isi cerita..." autocomplete="off" aria-label="Cari">
+  <input id="q" type="search" autocomplete="off" placeholder="Cari nama, negara, tema, isi cerita..." autocomplete="off" aria-label="Cari">
   <div class="chips" id="chips" role="group" aria-label="Tema"></div>
   <div class="opts">
-    <label><input type="radio" name="st" value="all" checked> Semua</label>
-    <label><input type="radio" name="st" value="belum"> Belum post</label>
-    <label><input type="radio" name="st" value="dah"> Dah post</label>
+    <label><input type="radio" name="st" value="all" checked autocomplete="off"> Semua</label>
+    <label><input type="radio" name="st" value="belum" autocomplete="off"> Belum post</label>
+    <label><input type="radio" name="st" value="dah" autocomplete="off"> Dah post</label>
     <span id="kira"></span>
   </div>
 </div></div>
@@ -100,7 +100,7 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 var SI=window.SIRI||{utama:[],arsip:[]}, TABS=SI.utama, S=window.STORIES=window.STORIES||[], PAGE=30, LIMIT=500, LOADED={};
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-var NAMA_GRUP={KisahBenar:'Kisah Benar',Sirah:'Sirah'};
+var NAMA_GRUP={KisahBenar:'Kisah Benar',Sirah:'Sirah',Emas:'Emas'},LABEL_ITEM={KisahBenar:'Kisah',Sirah:'Cerita',Emas:'Set'};
 function grupDari(n){return n.split('-')[0]}
 var GRUP=[];TABS.forEach(function(n){var g=grupDari(n);if(GRUP.indexOf(g)<0)GRUP.push(g)});
 var st={grup:ld('grup',GRUP[0]),tab:ld('tab',TABS[0]||'Archive'),q:'',tema:'Semua',status:'all',n:PAGE,dah:ld('dahPost',{}),open:{},pecah:{}};
@@ -184,9 +184,9 @@ function renderHari(list){
   var d=new Date(),k=d.getFullYear()*372+d.getMonth()*31+d.getDate();
   var s=pool[k%pool.length];
   var box=el('div','hari'),l=el('div');
-  var sm=el('small',null,'Cadangan hari ni');l.appendChild(sm);l.appendChild(el('b',null,'Kisah '+String(s.no).padStart(2,'0')+' · '+s.nama));
+  var sm=el('small',null,'Cadangan hari ni');l.appendChild(sm);l.appendChild(el('b',null,(LABEL_ITEM[grupDari(s.siri)]||'Set')+' '+String(s.no).padStart(2,'0')+' · '+(s.nama||s.tajuk)));
   var b=el('button','btn pri','Buka');b.type='button';
-  b.onclick=function(){st.q=s.nama;$('q').value=s.nama;st.tema='Semua';st.status='all';document.querySelector('input[name=st][value=all]').checked=true;st.n=PAGE;render();window.scrollTo(0,0)};
+  b.onclick=function(){var kunci=s.nama||s.tajuk;st.q=kunci;$('q').value=kunci;st.tema='Semua';st.status='all';document.querySelector('input[name=st][value=all]').checked=true;st.n=PAGE;render();window.scrollTo(0,0)};
   box.appendChild(l);box.appendChild(b);h.appendChild(box);
 }
 function card(s){
@@ -213,11 +213,11 @@ function card(s){
   var b1=el('button','btn pri','📋 Copy Thread');b1.type='button';b1.onclick=function(){salin(full,b1,'📋 Copy Thread')};
   var b2=el('button','btn','📋 Copy Hook');b2.type='button';b2.onclick=function(){salin(s.hook,b2,'📋 Copy Hook')};
   var b3=el('button','btn','🧵 Pecah ikut '+LIMIT+' aksara');b3.type='button';
-  var b4=el('a','btn','🔗 Sumber: '+s.sumber);b4.href=s.link;b4.target='_blank';b4.rel='noopener noreferrer';
+  var b4=null;if(s.link){b4=el('a','btn','🔗 Sumber: '+s.sumber);b4.href=s.link;b4.target='_blank';b4.rel='noopener noreferrer'}
   var b5=el('button','btn',st.dah[s.id]?'✓ Dah post':'Tanda dah post');b5.type='button';
   b5.onclick=function(){if(st.dah[s.id])delete st.dah[s.id];else st.dah[s.id]=1;sv('dahPost',st.dah);render()};
   r.appendChild(b1);r.appendChild(b2);r.appendChild(b3);r.appendChild(b5);c.appendChild(r);
-  var r2=el('div','row');r2.appendChild(b4);c.appendChild(r2);
+  if(b4){var r2=el('div','row');r2.appendChild(b4);c.appendChild(r2)}
   if(s.visual){c.appendChild(el('div','lbl','Gambaran gambar tular'));c.appendChild(el('div','box',s.visual))}
   if(s.gambar){
     c.appendChild(el('div','lbl','Kata kunci cari gambar'));
@@ -255,7 +255,13 @@ function render(){
   $('lagi').hidden=list.length<=st.n;
 }
 var tm;$('q').addEventListener('input',function(e){clearTimeout(tm);tm=setTimeout(function(){st.q=e.target.value;if(st.q)st.tema='Semua';st.n=PAGE;render()},120)});
+function segerak(){ // browser boleh pulihkan radio/kotak carian selepas refresh atau butang Back; selaraskan keadaan dengan DOM
+  var r=document.querySelector('input[name=st]:checked');st.status=r?r.value:'all';
+  st.q=$('q').value;
+}
 Array.prototype.forEach.call(document.querySelectorAll('input[name=st]'),function(r){r.onchange=function(){st.status=r.value;st.n=PAGE;render()}});
+window.addEventListener('pageshow',function(e){if(e.persisted){segerak();render()}});
+segerak();
 $('lagi').onclick=function(){st.n+=PAGE;render()};
 pergi();
 })();
