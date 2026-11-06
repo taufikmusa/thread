@@ -118,6 +118,21 @@ def bina(a, tema, paras):
         if fmt == 'kolon':
             if blok[0][0].startswith('Kata Kunci'):
                 gambar = blok.pop(0)[0].split(':', 1)[1].strip()
+        visual = ''
+        if fmt == 'kolon':                                # set 20: Kategori & Latar / [Visual Gambar] / sumber di hujung
+            if blok[0][0].startswith('Kategori'):
+                kat = blok.pop(0)[0].split(':', 1)[1].strip()
+                km = re.match(r'^(.*)\s\(([^()]*)\)\s*$', kat)
+                if km:
+                    subtema = km.group(1).strip()
+                    lokasi, tahun = km.group(2).rsplit(' - ', 1) if ' - ' in km.group(2) else (km.group(2), '')
+                else:
+                    subtema = kat
+            if blok[0][0].startswith('[Visual'):
+                visual = blok.pop(0)[0].split(']:', 1)[1].strip()
+            if not blok[0][0].startswith('Sumber'):
+                k = max(k for k, (t, _) in enumerate(blok) if t.startswith('Sumber'))
+                blok.insert(0, blok.pop(k))
         sumber_t, sumber_l = blok[0]
         assert sumber_t.startswith('Sumber'), f'Kisah {no}: baris sumber tiada ({sumber_t[:40]})'
         assert sumber_l, f'Kisah {no}: sumber tiada hyperlink'
@@ -140,6 +155,7 @@ def bina(a, tema, paras):
                   sumber=re.sub(r'\s*\(https?://.*$', '', sumber_t.split(':', 1)[1].strip()), link=sumber_l[0], tema=tm, hook=hook, body=body)
         if subtema: it['subtema'] = subtema
         if gambar: it['gambar'] = gambar
+        if visual: it['visual'] = visual
         items.append(it)
     return items
 
