@@ -89,6 +89,7 @@ def bina(a, tema, paras):
         end = idx[n + 1] if n + 1 < len(idx) else len(paras)
         blok = [(t, l) for t, l in paras[i + 1:end] if t]
         no = n + 1
+        hook_awal = visual_awal = ''
         if fmt == 'old':
             m = old.match(paras[i][0])
             subjek, meta = m.group(2).rsplit(' \u2014 ', 1)
@@ -101,7 +102,10 @@ def bina(a, tema, paras):
         else:
             m = new.match(paras[i][0])
             rest = m.group(2).strip()
-            if rest.endswith(')') and ' (' in rest:   # set 04-08: tajuk (LOKASI - TAHUN)
+            mt = re.match(r'^TAHUN\s+(.+?)\s*[\u2022\u00b7]\s*(.+)$', rest)   # set 23+: TAHUN 1916 • KATEGORI
+            if mt:
+                sub, lokasi, tahun = mt.group(2), '', mt.group(1)
+            elif rest.endswith(')') and ' (' in rest:   # set 04-08: tajuk (LOKASI - TAHUN)
                 sub, meta = rest.rsplit(' (', 1)
                 meta = meta.rstrip(')')
                 lokasi, tahun = meta.rsplit(' - ', 1) if ' - ' in meta else (meta, '')
@@ -114,11 +118,18 @@ def bina(a, tema, paras):
             if ym:                                                    # tahun hujung tajuk -> medan tahun
                 tahun = tahun or ym.group(1); tajuk = tajuk[:ym.start()]
             nama = tajuk
+            if mt:                                                    # set 23+: petikan, [Visual Gambar Ikonik], sumber di hujung
+                if blok and re.match(r'^[\u201c"]', blok[0][0]): hook_awal = blok.pop(0)[0]
+                if blok and blok[0][0].startswith('Visual Gambar'):
+                    visual_awal = blok.pop(0)[0].split(':', 1)[1].strip()
+                if not blok[0][0].startswith('Sumber'):
+                    k = max(k for k, (t, _) in enumerate(blok) if t.startswith('Sumber'))
+                    blok.insert(0, blok.pop(k))
         gambar = ''
         if fmt == 'kolon':
             if blok[0][0].startswith('Kata Kunci'):
                 gambar = blok.pop(0)[0].split(':', 1)[1].strip()
-        visual = ''
+        visual = visual_awal
         if fmt == 'kolon':                                # set 20: Kategori & Latar / [Visual Gambar] / sumber di hujung
             if blok[0][0].startswith('Kategori'):
                 kat = blok.pop(0)[0].split(':', 1)[1].strip()
@@ -144,6 +155,9 @@ def bina(a, tema, paras):
                 ekor = [t for t in sisa if OUTRO_KIRAAN.get(t, 0) < 10 and not t.startswith('Kisah #')]
                 body = body[:v] + ekor if not a_outro else body
             hook = body.pop(0)
+        elif hook_awal:
+            hook = hook_awal
+            body = [t for t, _ in blok[1:]]
         else:
             hook = blok[1][0]
             body = [t for t, _ in blok[2:]]
