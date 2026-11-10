@@ -23,10 +23,16 @@ def main():
     paras = dk.baca(a.docx)
     first = [i for i, (t, _) in enumerate(paras) if re.fullmatch(r'#\d+', t)]
     assert len(first) == 30, f'baris indeks {len(first)}'
+    ncol = first[1] - first[0]
+    ada_sumber = any('sumber' in t.lower() for t, _ in paras[first[0] - ncol:first[0]])
     idx = []
     for i in first:
-        (_, _), (tj, _), (lt, _), (sb, sl) = paras[i], paras[i + 1], paras[i + 2], paras[i + 3]
-        idx.append((tj, lt, sb, sl[0] if sl else ''))
+        if ada_sumber:            # Tajuk | Lokasi & Tahun | Sumber (+pautan)
+            (_, _), (tj, _), (lt, _), (sb, sl) = paras[i], paras[i + 1], paras[i + 2], paras[i + 3]
+            idx.append((tj, lt, sb, sl[0] if sl else ''))
+        else:                     # set refleksi: Tajuk | Tema Kewangan | Petikan Pembuka (tiada sumber)
+            (_, _), (tj, _), (tm, _) = paras[i], paras[i + 1], paras[i + 2]
+            idx.append((tj, tm, '', ''))
     hs = [i for i, (t, _) in enumerate(paras) if i > first[-1] and re.match(r'^(SET\s*\d+\s*-\s*)?CERITA\s*#\d+\s*\|', t)]
     assert len(hs) == 30, f'tajuk cerita {len(hs)}'
     items = []
@@ -35,22 +41,29 @@ def main():
         blok = [t for t, _ in paras[i + 1:end] if t.strip()]
         tj, lt, sb, link = idx[n]
         assert blok[0].startswith(f'{n+1:02d}.'), f'Cerita {n+1}: baris tajuk tiada ({blok[0][:40]})'
-        ks = [k for k, t in enumerate(blok) if re.match(r'^Sumber\b', t)]
-        assert ks, f'Cerita {n+1}: baris sumber tiada'
-        k = ks[-1]
-        assert link.startswith('http'), f'Cerita {n+1}: pautan indeks tiada'
-        tagar = [t for t in blok[k + 1:] if t.startswith('#')]     # contoh #HappyLoop (di bawah senarai sumber dalam docx)
-        story = blok[1:k] + tagar
-        assert len(story) >= 30, f'Cerita {n+1}: teks terlalu pendek ({len(story)})'
+        if ada_sumber:
+            ks = [k for k, t in enumerate(blok) if re.match(r'^Sumber\b', t)]
+            assert ks, f'Cerita {n+1}: baris sumber tiada'
+            k = ks[-1]
+            assert link.startswith('http'), f'Cerita {n+1}: pautan indeks tiada'
+            tagar = [t for t in blok[k + 1:] if t.startswith('#')]     # contoh #HappyLoop (di bawah senarai sumber dalam docx)
+            story = blok[1:k] + tagar
+        else:
+            story = blok[1:]
+        assert len(story) >= 20, f'Cerita {n+1}: teks terlalu pendek ({len(story)})'
         hook = story.pop(0)
-        m = re.match(r'^(.*?)\s*\(([^()]*)\)\s*$', lt)
-        lokasi, tahun = (m.group(1), m.group(2)) if m else (lt, '')
-        it = dict(id=a.mula + n, siri=a.siri, no=n + 1, tajuk=tj, lokasi=lokasi, tahun=tahun, sumber=sb, link=link,
+        if ada_sumber:
+            m = re.match(r'^(.*?)\s*\(([^()]*)\)\s*$', lt)
+            lokasi, tahun = (m.group(1), m.group(2)) if m else (lt, '')
+            subtema = ''
+        else:
+            lokasi = tahun = ''; subtema = lt          # 'Tema Kewangan' dari indeks
+        it = dict(id=a.mula + n, siri=a.siri, no=n + 1, tajuk=tj, lokasi=lokasi, tahun=tahun, subtema=subtema, sumber=sb, link=link,
                   tema=tema.get(str(n + 1), ''), hook=hook, body=story)
         if str(n + 1) in langkau: continue
         items.append({k: v for k, v in it.items() if v != ''})
     if a.jadual:
-        for it in items: print(it['no'], '|', it['tajuk'][:80], '|', it.get('lokasi', ''), file=sys.stderr)
+        for it in items: print(it['no'], '|', it['tajuk'][:80], '|', it.get('lokasi', '') or it.get('subtema', ''), file=sys.stderr)
     blok = ',\n'.join(json.dumps(it, ensure_ascii=False) for it in items)
     if a.fail:
         open(a.fail, 'w', encoding='utf8').write(f'(window.STORIES=window.STORIES||[]).push(\n{blok}\n);\n')
