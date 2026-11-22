@@ -12,6 +12,9 @@ here = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location('dk', os.path.join(here, 'docx_ke_data.py'))
 dk = importlib.util.module_from_spec(spec); spec.loader.exec_module(dk)
 
+dk.ACRONIM |= {'HMS', 'USS', 'RMS', 'NYPD', 'RAF', 'NASA', 'FBI', 'CIA', 'TV'}
+tc = dk.tc
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('docx'); ap.add_argument('--siri', required=True)
@@ -24,11 +27,14 @@ def main():
     assert len(first) == a.bil, f'baris indeks {len(first)}'
     ncol = first[1] - first[0]
     hdr = [t for t, _ in paras[first[0] - ncol:first[0]]]
-    assert ncol == 4, f'kolum indeks {ncol}: {hdr}'
-    idx = [tuple(paras[i + k][0] for k in (1, 2, 3)) for i in first]
-    hs = [i for i, (t, _) in enumerate(paras) if i > first[-1] and re.match(r'^(CERITA|COPYWRITING)\s*#\d+\s*\|', t)]
+    assert ncol in (3, 4), f'kolum indeks {ncol}: {hdr}'
+    if ncol == 3:             # No. | NAMA HURUF BESAR | Tahun | Lokasi  (set kucing 03)
+        idx = [(paras[i + 1][0], paras[i + 2][0], '') for i in first]
+    else:
+        idx = [tuple(paras[i + k][0] for k in (1, 2, 3)) for i in first]
+    hs = [i for i, (t, _) in enumerate(paras) if i > first[-1] and re.match(r'^((CERITA|COPYWRITING)\s*#\d+|SET\s*\d+\s*/\s*\d+)\s*\|', t)]
     assert len(hs) == a.bil, f'tajuk cerita {len(hs)}'
-    mode_lokasi = 'lokasi' in hdr[2].lower()          # kucing: Nama | Lokasi & Tahun | Ringkasan
+    mode_lokasi = 'lokasi' in hdr[2].lower() or ncol == 3   # kucing: Nama | Lokasi & Tahun | Ringkasan
     items = []
     for n, i in enumerate(hs):
         end = hs[n + 1] if n + 1 < len(hs) else len(paras)
@@ -36,7 +42,10 @@ def main():
         c1, c2, c3 = idx[n]
         assert len(blok) >= 8, f'Cerita {n+1}: teks terlalu pendek ({len(blok)})'
         hook = blok.pop(0)
-        if mode_lokasi:
+        if mode_lokasi and ncol == 3:
+            tahun, _, lokasi = c2.partition(' | ')          # '2011-2023 | Huddersfield, England'
+            it = dict(id=a.mula + n, siri=a.siri, no=n + 1, tajuk=tc(c1), lokasi=lokasi.strip(), tahun=tahun.strip())
+        elif mode_lokasi:
             m = re.match(r'^(.*?)\s*\(([^()]*)\)\s*$', c2)
             lokasi, tahun = (m.group(1), m.group(2)) if m else (c2, '')
             it = dict(id=a.mula + n, siri=a.siri, no=n + 1, tajuk=c1, lokasi=lokasi, tahun=tahun, subtema=c3)
