@@ -20,6 +20,7 @@ def main():
     ap.add_argument('docx'); ap.add_argument('--siri', required=True)
     ap.add_argument('--mula', type=int, required=True); ap.add_argument('--tema'); ap.add_argument('--fail')
     ap.add_argument('--bil', type=int, default=30, help='bilangan cerita dijangka'); ap.add_argument('--jadual', action='store_true')
+    ap.add_argument('--langkau', default='', help='nombor cerita (dalam docx) yang dilangkau, dipisah koma')
     a = ap.parse_args()
     tema = json.load(open(a.tema, encoding='utf8')) if a.tema else {}
     paras = dk.baca(a.docx)
@@ -52,6 +53,7 @@ def main():
         else:                                          # refleksi: Hook | Tokoh & Sumber | Fokus
             it = dict(id=a.mula + n, siri=a.siri, no=n + 1, tajuk=c2, subtema=c3)
         it.update(tema=tema.get(str(n + 1), ''), hook=hook, body=blok)
+        if str(n + 1) in {x.strip() for x in a.langkau.split(',')}: continue
         items.append({k: v for k, v in it.items() if v != ''})
     if a.jadual:
         for it in items: print(it['no'], '|', it['tajuk'][:50], '|', it.get('lokasi', ''), '|', it.get('subtema', '')[:90], file=sys.stderr)
