@@ -100,7 +100,7 @@ footer{padding:24px 16px 40px;text-align:center;font-size:12px;color:var(--muted
 var SI=window.SIRI||{utama:[],arsip:[]}, TABS=SI.utama, S=window.STORIES=window.STORIES||[], PAGE=30, LIMIT=500, LOADED={};
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-var NAMA_GRUP={KisahBenar:'Kisah Benar',Sirah:'Sirah',Emas:'Emas',Variasi:'Variasi'},LABEL_ITEM={KisahBenar:'Kisah',Sirah:'Cerita',Emas:'Set',Variasi:'Cerita'};
+var NAMA_GRUP={KisahBenar:'Kisah Benar',Sirah:'Sirah',Emas:'Emas',Variasi:'Variasi',Kucing:'Kucing'},LABEL_ITEM={KisahBenar:'Kisah',Sirah:'Cerita',Emas:'Set',Variasi:'Cerita',Kucing:'Cerita'};
 function grupDari(n){return n.split('-')[0]}
 var GRUP=[];TABS.forEach(function(n){var g=grupDari(n);if(GRUP.indexOf(g)<0)GRUP.push(g)});
 var st={grup:ld('grup',GRUP[0]),tab:ld('tab',TABS[0]||'Archive'),q:'',tema:'Semua',status:'all',n:PAGE,dah:ld('dahPost',{}),open:{},pecah:{}};
